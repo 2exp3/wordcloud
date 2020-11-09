@@ -1,0 +1,42 @@
+<h4>Con esta app podés:</h4>
+         
+         <ol>
+         <li>Usar  distintos inputs de texto con el <b>menú de la izquierda</b>:
+         <ul>
+         <li>Los <a href="https://www.casarosada.gob.ar/informacion/discursos?start=0">discursos de inicio de sesiones del Congreso</a> de 
+       <ul>
+         <li>Alberto Fernández en 2020 (AF)</li>
+         <li>Mauricio Macri en 2017 (MM)</li>
+         
+         </ul>
+         <li>Escribir o copiar-y-pegar texto</li>
+         <li>Subir un archivo con formato
+       <ul>
+         <li><b>.csv</b>: OJO, todo el texto tiene que estar en la primera columna <a href="https://www.github.com/2exp3/examples/JC.csv">(ejemplo)</a></li>
+         <li><b>.txt</b> <a href="https://www.github.com/2exp3/examples/JC.txt">(ejemplo)</a></li>
+         <li><b>.pdf</b>:Por ahora, es una función experimental. Tené en cuenta que mientras más largo sea, más tiempo de procesamiento toma. <a href="https://www.github.com/2exp3/examples/JC.pdf">(ejemplo)</a></li> 
+         </ul>
+         <li> No te olvides de elegir el <b>idioma</b> en el que está tu texto para que podamos remover los signos de puntuación y las <a href="https://es.wikipedia.org/wiki/Palabra_vac%C3%ADa">palabras vacías. </a> </li>     
+         <li> Si hay otras palabras que quieras remover manualmente, podés hacerlo también.
+       </li> 
+         </ul>
+         </ul> 
+         <br>
+         <li>Personalizar tu nube de palabras con el <b>menú de la derecha</b>
+         <ul>
+         <li>Los controles son intuitivos, jugá con ellos para ver cómo cambia tu nube (el tamaño de las letras define el tamaño de la nube).</li>
+         </ul>
+         </ul>   
+         <br>
+         <li> Tocar la solapa del medio para descargar tu
+       <ul>
+         <li> nube en <b>.png</b>      
+         <li> texto procesado (palabras y frecuencias) en <b>.csv</b>      
+         </ul>
+         </ol>
+         
+         <style>h3 {text-align: center;} 
+         h5 {text-align: center;} 
+         ul {word-wrap: break-word;}</style>
+         <h5>Para ver la demo, apretá la nube. </h5>
+         <h3>¡Que lluevan palabras!</h3>
