@@ -8,6 +8,6 @@ Hungarian
 English
 Italian
 Norwegian
-Portugues
+Portuguese
 Russian
 Swedish

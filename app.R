@@ -1,11 +1,11 @@
 library(shiny);library(wordcloud2);library(tm);library(colourpicker);library(shinyMobile); library(sysfonts);library(shinyWidgets);
-library(htmlwidgets); library(tesseract); library(shinyscreenshot); library(data.table);library(pdftools);
+library(htmlwidgets); library(tesseract); library(shinyscreenshot); library(data.table);library(pdftools); library(waiter);
 
 source("helper.R")
 
-
 # UI ====
 ui = f7Page(
+  use_waiter(),
   title = "WordCloud",
   init = f7Init(skin = "auto", color = "blue",theme = "light"),
   f7TabLayout(
@@ -24,6 +24,7 @@ ui = f7Page(
           effect = "cover",
           resizable = T, 
           tagList(
+            
             f7Radio(
               inputId = "source",
               label = "",
@@ -54,12 +55,31 @@ ui = f7Page(
               selected = "Spanish",
               width = "100%"
             ),
-            f7Toggle(inputId = "remove_words",label =  "Remover palabras específicas",checked =  FALSE),
             conditionalPanel(
-              condition = "input.remove_words == 1",
-              textAreaInput(inputId = "words_to_remove", label = "Separá las palabras con un espacio",rows=7,
-                            placeholder = "Palabras a remover...")
-            )
+              condition = "input.source == 'Escribir'",
+              actionBttn(
+                icon = icon("cloud-upload"),size = "md",style = "unite",
+                inputId = "go_words",label = "",color = "primary"
+              )
+            ),
+          
+            h3("   Filtrar palabras"),
+            # num of words
+            f7Slider(
+              inputId = "num",
+              label = "Cantidad",
+              color = "green",
+              min = 3,
+              max = 1000, 
+              labels = tagList(f7Icon("minus"),
+                               f7Icon("plus")),
+              value = 100,
+              step = 10
+            ),
+            textAreaInput(inputId = "words_to_remove", label = "Remover",rows=7,
+                          placeholder = "Separá las palabras a remover con un espacio..."),
+            f7Block()
+       
           ),
           theme = "dark",
           side = "left",
@@ -86,18 +106,6 @@ ui = f7Page(
             ),
             
             h3("   Palabras"),
-            # num of words
-            f7Slider(
-              inputId = "num",
-              label = "Cantidad",
-              color = "green",
-              min = 3,
-              max = 1000, 
-              labels = tagList(f7Icon("minus"),
-                               f7Icon("plus")),
-              value = 100,
-              step = 10
-            ),
             # font size
             f7Slider(
               inputId = "wsize",
@@ -167,7 +175,7 @@ ui = f7Page(
             knobInput(
               cursor = T,
               inputId = "wminRotation",
-              label = "Ángulo mínimo",
+              label = "Angulo mínimo",
               thickness = 0.2,
               post = "",
               displayInput = T,
@@ -181,7 +189,7 @@ ui = f7Page(
             knobInput(
               cursor = T,
               inputId = "wmaxRotation",
-              label = "Ángulo máximo",
+              label = "Angulo máximo",
               thickness = 0.2,
               post = "",
               displayInput = T,
@@ -195,7 +203,6 @@ ui = f7Page(
             f7Slider(
               inputId = "wrotateRatio",
               label = "Probabilidad de rotar",
-              # color = "blue",
               min = 0,
               max = 1,
               labels = tagList(f7Icon("arrow_down_circle"),
@@ -223,10 +230,10 @@ ui = f7Page(
           intensity = 5,
           hover = T,
           f7Card_hw(
-            height = "500px",
+            height = "100%",
             tagList(
               cloudBttn(
-                icon = icon("cloud"),size = "lg",style = "jelly",
+                icon = icon("cloud"),size = "lg",style = "unite",
                 inputId = "go_cloud",label = "",color = "primary"
               ), br(), br(),
               # display cloud!
@@ -241,7 +248,6 @@ ui = f7Page(
         tabName = "Descargar",
         icon = f7Icon("cloud_download"),
         active = FALSE,
-        
         f7Block(), 
         f7Flex(
           f7Block(),
@@ -256,7 +262,7 @@ ui = f7Page(
                   , 
                   f7Block() 
                 ),  
-                screenshotButton(id = "cloud",filename = "mi_nube.png",scale = 3,timer = 1,
+                screenshotButton(id = "cloud",filename = "mi_nube",scale = 3,timer = 1,
                                  icon = icon("download"), class="button button-fill",
                                  label = "NUBE (.PNG) ")
               )
@@ -325,152 +331,209 @@ ui = f7Page(
 
 # SERVER ====
 server = function(input, output) {
+  
   # functions ====
   # pdf - text  conversion
-  pdf2text=function(input,  dpi=300){
+  pdf2text=function(filepath,  dpi=300){
+    # show wheel while working
+    waiter = Waiter$new(id="cloud")
+    waiter$show()
+    on.exit(waiter$hide())
     # pdf to png
-    pngfile = pdf_convert(input$Archivo$datapath, dpi = dpi)
+    pngfile = pdf_convert(filepath, dpi = dpi)
     # ppng to text using lang specific engine
     text = ocr(pngfile)
     textcat=paste(text, collapse = '') # concat char vectors (for >1-page pdfs)
     return(textcat)
   }
-  
   # to get wordfreq data from input
-  create_data = function(data, num_words = 100) {
+  get_freq = function(data, lang = "Spanish") {
     # If text is provided, convert it to a data table of word frequencies
-    if (is.character(data)) {
-      corpus = Corpus(VectorSource(data)) 
-      corpus = tm_map(corpus, tolower)
-      corpus = tm_map(corpus, removePunctuation)
-      corpus = tm_map(corpus, removeNumbers)
-      corpus = tm_map(corpus, 
-                      removeWords, stopwords(tolower(input$language)))
-      # remove user words
-      if (input$remove_words==T){corpus = tm_map(corpus, 
-                                                 removeWords, unlist(strsplit(input$words_to_remove)," "))}
-
-      tdm = as.matrix(TermDocumentMatrix(corpus))
-      data = sort(rowSums(tdm), decreasing = TRUE, method="quick")
-      data = data.table(word = names(data), freq = as.numeric(data))
-      
-    }
-    
+    if (!is.character(data)) {
+      return()}
+    corpus = Corpus(VectorSource(data)) 
+    corpus = tm_map(corpus, tolower)
+    corpus = tm_map(corpus, removePunctuation)
+    corpus = tm_map(corpus, removeNumbers)
+    corpus = tm_map(corpus, 
+                    removeWords, stopwords(tolower(lang)))
+    tdm = as.matrix(TermDocumentMatrix(corpus))
+    dataout = sort(rowSums(tdm), decreasing = TRUE, method="quick")
+    dataoutcl = data.table(word = names(dataout), freq = as.numeric(dataout))
+    return(dataoutcl)
+  }
+  
+  subset_data=function(data,num_words = 100, wtr=NULL){
+    # remove user words
+    datarm = data[!data$word%in%unlist(strsplit(wtr," ") ), ]
     # Make sure a proper num_words is provided
     if (!is.numeric(num_words) || num_words < 3) {
       num_words = 3
-    }else if(num_words>nrow(data)) {
-      num_words = nrow(data)
+    }else if(num_words>nrow(datarm)) {
+      num_words = nrow(datarm)
     }
-    
     # Grab the top n most common words
-    data = head(data, n = num_words)
-    if (nrow(data) == 0) {
+    datarmn = head(datarm, n = num_words)
+    if (nrow(datarmn) == 0) {
       return(NULL)
     }else{
-      return(data)
+      return(datarmn)
     }
   }
   
   # to get the cloud from the data with freqs
-  create_cloud = function(data, 
-                          wbackgroundColor = "#ffffff", 
-                          wsize = 0.5,
-                          wgridSize = 0,
-                          wfontFamily = "Segoe UI",
-                          wfontWeight = 400,
-                          wcolor="random-dark",
-                          wcolorm = NULL,
-                          wminRotation = 0,
-                          wmaxRotation = 0,
-                          wrotateRatio = 1,
-                          wshape = "circle") {
+  create_cloud = function(data,pars) {
+    # customize cloud
+    return(wordcloud2(
+      data,
+      backgroundColor = pars$wbackgroundColor,
+      size =pars$ wsize,
+      gridSize = pars$wgridSize,
+      fontFamily = pars$wfontFamily,
+      fontWeight=pars$wfontWeight,
+      color = pars$wcolor,
+      minRotation = pars$wminRotation_rad,
+      maxRotation = pars$wmaxRotation_rad,
+      shuffle = F,
+      rotateRatio = pars$wrotateRatio,
+      shape = pars$wshape
+    ) )
+  }
+  
+  set_cloud_params = function(input) {
     # transform degrees to radians
     wminRotation_rad=input$wminRotation * (pi/180)
     wmaxRotation_rad=input$wmaxRotation * (pi/180)
     
     # text color
-    wcolor=ifelse(wcolor=="tu color",wcolorm,wcolor)
+    wcolor=ifelse(input$wcolor=="tu color",
+                  input$wcolorm,
+                  input$wcolor) 
     
-    # customize cloud
-    wordcloud2(
-      data,
-      # widgetsize = c("50%","50%"),
-      backgroundColor = wbackgroundColor,
-      size = wsize,
-      gridSize = wgridSize,
-      fontFamily = wfontFamily,
-      fontWeight=wfontWeight,
-      color = wcolor,
-      minRotation = wminRotation_rad,
-      maxRotation = wmaxRotation_rad,
-      shuffle = F,
-      rotateRatio = wrotateRatio,
-      shape = wshape
-    )
-}
+    return(list(wbackgroundColor = input$col,
+                wsize = input$wsize,
+                wgridSize = input$wgridSize,
+                wfontFamily = input$wfontFamily,
+                wfontWeight=input$wfontWeight,
+                wcolor = wcolor,
+                wminRotation = input$wminRotation,
+                wmaxRotation = input$wmaxRotation,
+                wrotateRatio = input$wrotateRatio,
+                wshape = input$wshape))
+  }
   
-  # Reactions ====
+  # Reactivity ====
 
-  # input data
-  data_source = reactive({
+  # user type data
+  data_type=eventReactive(
+    input$go_words,{
+      
+      return(input$text)
+    } 
+  )
+  
+  # user file
+  data_user=eventReactive(
+    input$Archivo,{
+      
+      if (substr(input$Archivo$name,nchar(input$Archivo$name)-2,nchar(input$Archivo$name)) == "pdf"){
+        return(pdf2text(input$Archivo$datapath,dpi = 300))
+      }else{
+        # if csv or txt
+        return(readLines(input$Archivo$datapath,encoding = "UTF-8") ) }
+    })
+  
+  # Demo data
+  data_demo= reactive({
     if (input$source == "Demo: MM") {
       wdata=readLines("www/MM.txt",encoding = "UTF-8")
     } else if (input$source == "Demo: AF") {
       wdata=readLines("www/AF.txt",encoding = "UTF-8")
-    } else if (input$source == "Escribir") {
-      wdata = input$text
-    } else if (input$source == "Subir archivo") {
-      wdata = input_file()
     }
+    
     return(wdata)
   })
   
-  # parse input file
-  input_file = reactive({
-    if (is.null(input$Archivo)) {
-      return("")
-    }
-    # if pdf
-    if (substr(input$Archivo$name,nchar(input$Archivo$name)-2,nchar(input$Archivo$name)) == "pdf"){
-      return(pdf2text(input))
-    }else{
-      # if csv or txt
-      return(readLines(input$Archivo$datapath,encoding = "UTF-8") )}
+  # set the actual data to process
+  data_source=reactive({
+    if(input$source %in%c("Demo: MM","Demo: AF")){
+      return(data_demo())
+    }else if (input$source=="Subir archivo"){
+      return(data_user())
+    }else if (input$source=="Escribir"){
+      return(data_type())
+    }else(return("")) # just in case sth goes wrong with file uploads
   })
   
-  # data with word freqs
-  datafreq = reactive ( {create_data(data = data_source(),input$num)} )
+  # initialize word freq data
+  datafreq=
+    reactive({
+    return(
+    get_freq(data = data_source(),
+             lang = input$language) ) } )
   
-  # create cloud on go
-  datacloud = eventReactive(
-    input$go_cloud,
-    {return(
-      create_cloud(datafreq(),
-                   wbackgroundColor = input$col,
-                   wsize = input$wsize,
-                   wgridSize = input$wgridSize,
-                   wfontFamily = input$wfontFamily,
-                   wfontWeight=input$wfontWeight,
-                   wcolor = input$wcolor,
-                   wcolorm = input$wcolorm,
-                   wminRotation = input$wminRotation,
-                   wmaxRotation = input$wmaxRotation,
-                   wrotateRatio = input$wrotateRatio,
-                   wshape = input$wshape) )
-    })
-  # render cloud
-  output$cloud = 
-    renderWordcloud2( { datacloud() })
-  
-
-  # export word data
-  output$download_csv = downloadHandler(
-    filename = function() {paste0('tus_palabras','.csv')},
-    content = function(file) {write.csv(datafreq(),file)
+  # update data on new source event and compute freqs on demand
+  observeEvent( 
+    data_source(),
+    ignoreInit = T,
+    ignoreNULL = F,{ 
+      datafreq=
+        get_freq(
+          data = data_source(),
+          lang = input$language) 
     }
   )
   
+  # subset data with word freqs when pushing the cloud
+  datafreq_ss = 
+    eventReactive (
+      input$go_cloud,
+      ignoreNULL = F,{
+        
+        return(
+          subset_data(
+            data= datafreq(),
+            num_words = input$num,
+            wtr = input$words_to_remove )
+        ) 
+      } )
+  
+  # parse cloud params
+  cloudpars = 
+    eventReactive (
+      input$go_cloud,ignoreNULL = F,{
+        set_cloud_params(input)
+      }
+    )
+    
+  # create cloud on go
+  datacloud = 
+    reactive({
+        # show wheel while working
+        waiter = Waiter$new(id="cloud")
+        waiter$show()
+        on.exit(waiter$hide())
+        return(
+          create_cloud(
+            datafreq_ss(),
+            cloudpars()
+          )
+        )
+      }
+    )
+  
+  # render cloud
+  output$cloud = 
+    renderWordcloud2( {
+      datacloud()
+    })
+  
+  # export word data
+  output$download_csv = downloadHandler(
+    filename = function() {paste0('tus_palabras','.csv')},
+    content = function(file) {write.csv(datafreq_ss(),file)
+    }
+  )
 }
 
 # RUN APP ====

@@ -1,5 +1,8 @@
 # extras ====
 
+# set waiter theme
+waiter_set_theme(html = spin_whirly(), color = "white")
+
 # load available cloud languages
 langs=readLines("www/langeng.txt",encoding="UTF-8")
 names(langs)= readLines("www/langesp.txt",encoding="UTF-8")

@@ -1,7 +1,7 @@
 <h4>Con esta app podés:</h4>
          
          <ol>
-         <li>Usar  distintos inputs de texto con el <b>menú de la izquierda</b>:
+         <li>Usar distintos inputs de texto con el <b>menú de la izquierda</b>:
          <ul>
          <li>Los <a href="https://www.casarosada.gob.ar/informacion/discursos?start=0">discursos de inicio de sesiones del Congreso</a> de 
        <ul>
@@ -9,16 +9,21 @@
          <li>Mauricio Macri en 2017 (MM)</li>
          
          </ul>
-         <li>Escribir o copiar-y-pegar texto</li>
+         <li>Escribir o copiar-y-pegar texto
+         <ul>
+         <li>Cuando termines de ingresar el texto, apretá el botón de la nube con la flecha hacia arriba para <i>subirlo</i>.</li>
+</ul>
          <li>Subir un archivo con formato
        <ul>
          <li><b>.csv</b>: OJO, todo el texto tiene que estar en la primera columna <a href="https://www.github.com/2exp3/examples/JC.csv">(ejemplo)</a></li>
          <li><b>.txt</b> <a href="https://www.github.com/2exp3/examples/JC.txt">(ejemplo)</a></li>
-         <li><b>.pdf</b>:Por ahora, es una función experimental. Tené en cuenta que mientras más largo sea, más tiempo de procesamiento toma. <a href="https://www.github.com/2exp3/examples/JC.pdf">(ejemplo)</a></li> 
+         <li><b>.pdf</b>: Por ahora, es una función experimental. Tené en cuenta que mientras más largo sea, más tiempo de procesamiento toma <a href="https://www.github.com/2exp3/examples/JC.pdf">(ejemplo)</a></li> 
          </ul>
-         <li> No te olvides de elegir el <b>idioma</b> en el que está tu texto para que podamos remover los signos de puntuación y las <a href="https://es.wikipedia.org/wiki/Palabra_vac%C3%ADa">palabras vacías. </a> </li>     
-         <li> Si hay otras palabras que quieras remover manualmente, podés hacerlo también.
+         <li>No te olvides de elegir el <b>idioma</b> en el que está tu texto <b>antes</b> de cambiar tu input, para que podamos remover los signos de puntuación y las <a href="https://es.wikipedia.org/wiki/Palabra_vac%C3%ADa">palabras vacías. </a> </li>     
+         <li>Elegir el número de palabras (más frecuentes) a usar.
        </li> 
+       <li>Filtrar más palabras que quieras remover manualmente.
+       </li>
          </ul>
          </ul> 
          <br>
@@ -38,5 +43,5 @@
          <style>h3 {text-align: center;} 
          h5 {text-align: center;} 
          ul {word-wrap: break-word;}</style>
-         <h5>Para ver la demo, apretá la nube. </h5>
+         <p>Para ver la demo y para <b>generar tu nube</b> (tanto cuando cambies el input o los parámetros visuales) <b>apretá la nube</b> que está en el centro de la pantalla principal.</p>
          <h3>¡Que lluevan palabras!</h3>
