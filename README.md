@@ -27,7 +27,7 @@ Podés probarla [áca](https://2exp3.shinyapps.io/wordcloud/).
 - Los controles son intuitivos, jugá con ellos para ver cómo cambia tu nube (el tamaño de las letras define el tamaño de la nube).
 
 ### Tocar la solapa del medio para descargar tu
-- nube en imagen **.png**
+- imagen de tu nube en **.png**
 - texto procesado (palabras y frecuencias) en una lista **.csv**
 
 Los cambios que hagas sobre la nube se actualizan en tiempo real, para que puedas personalizar con ayuda del feedback.
