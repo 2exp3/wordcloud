@@ -65,7 +65,7 @@ wordcloud2a <- function (data, size = 1, minSize = 0, gridSize = 0, fontFamily =
 ui = f7Page(
   use_waiter(),
   title = "WordCloud",
-  init = f7Init(skin = "auto", color = "blue",theme = "light"),
+  init = f7Init(skin = "auto", color = "blue",theme = "light",),
   f7TabLayout(
     navbar = 
       f7Navbar(
