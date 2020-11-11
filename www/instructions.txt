@@ -43,5 +43,5 @@
          <style>h3 {text-align: center;} 
          h5 {text-align: center;} 
          ul {word-wrap: break-word;}</style>
-         <p>Para ver la demo y para <b>generar tu nube</b> (tanto cuando cambies el input o los parámetros visuales) <b>apretá la nube</b> que está en el centro de la pantalla principal.</p>
+         <p>Para empezar, <b>apretá la solapa que dice Nube</b> y elegí tu input en el menú de la izquierda. Tu nube va a aparecer en el centro y, con cada cambio que hagas, se va a ir actualizando para que puedas personalizarla en tiempo real.</p>
          <h3>¡Que lluevan palabras!</h3>

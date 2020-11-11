@@ -1,7 +1,65 @@
-library(shiny);library(wordcloud2);library(tm);library(colourpicker);library(shinyMobile); library(sysfonts);library(shinyWidgets);
-library(htmlwidgets); library(tesseract); library(shinyscreenshot); library(data.table);library(pdftools); library(waiter);
+library(shiny);library(wordcloud2);library(tm);library(colourpicker);library(shinyMobile);library(shinyWidgets);
+library(shinyscreenshot);
+library(waiter);
+library(tesseract); library(pdftools)
 
-source("helper.R")
+#  set some overall params ====
+# set waiter theme
+waiter_set_theme(html = spin_whirly(), color = "white")
+
+# load available cloud languages
+langs=readLines("www/langeng.txt",encoding="UTF-8")
+names(langs)= readLines("www/langesp.txt",encoding="UTF-8")
+langs = langs[order(names(langs))]
+
+# instructions text
+instructions=HTML(readLines("www/instructions.txt",encoding = "UTF-8") ) 
+
+# remove annoying refreshing
+wordcloud2a <- function (data, size = 1, minSize = 0, gridSize = 0, fontFamily = "Segoe UI", 
+                         fontWeight = "bold", color = "random-dark", backgroundColor = "white", 
+                         minRotation = -pi/4, maxRotation = pi/4, shuffle = TRUE, 
+                         rotateRatio = 0.4, shape = "circle", ellipticity = 0.65, 
+                         widgetsize = NULL, figPath = NULL, hoverFunction = NULL) 
+{
+  if ("table" %in% class(data)) {
+    dataOut = data.frame(name = names(data), freq = as.vector(data))
+  }
+  else {
+    data = as.data.frame(data)
+    dataOut = data[, 1:2]
+    names(dataOut) = c("name", "freq")
+  }
+  if (!is.null(figPath)) {
+    if (!file.exists(figPath)) {
+      stop("cannot find fig in the figPath")
+    }
+    spPath = strsplit(figPath, "\\.")[[1]]
+    len = length(spPath)
+    figClass = spPath[len]
+    if (!figClass %in% c("jpeg", "jpg", "png", "bmp", "gif")) {
+      stop("file should be a jpeg, jpg, png, bmp or gif file!")
+    }
+    base64 = base64enc::base64encode(figPath)
+    base64 = paste0("data:image/", figClass, ";base64,", 
+                    base64)
+  }
+  else {
+    base64 = NULL
+  }
+  weightFactor = size * 180/max(dataOut$freq)
+  settings <- list(word = dataOut$name, freq = dataOut$freq, 
+                   fontFamily = fontFamily, fontWeight = fontWeight, color = color, 
+                   minSize = minSize, weightFactor = weightFactor, backgroundColor = backgroundColor, 
+                   gridSize = gridSize, minRotation = minRotation, maxRotation = maxRotation, 
+                   shuffle = shuffle, rotateRatio = rotateRatio, shape = shape, 
+                   ellipticity = ellipticity, figBase64 = base64, hover = htmlwidgets::JS(hoverFunction))
+  chart = htmlwidgets::createWidget("wordcloud2", settings, 
+                                    width = widgetsize[1], height = widgetsize[2], sizingPolicy = htmlwidgets::sizingPolicy(viewer.padding = 0, 
+                                                                                                                            browser.padding = 0, browser.fill = TRUE))
+  chart
+}
+
 
 # UI ====
 ui = f7Page(
@@ -19,12 +77,11 @@ ui = f7Page(
       ),
     panels =  
       tagList(
-        # left-hand side bar
+        # left-hand side bar ====
         f7Panel(
           effect = "cover",
           resizable = T, 
           tagList(
-            
             f7Radio(
               inputId = "source",
               label = "",
@@ -35,6 +92,14 @@ ui = f7Page(
                 "Subir archivo"
               ),
               selected = "Demo: AF"
+            ),
+            # Add the selector for the language of the text
+            f7Select(
+              inputId = "language",
+              label = "Idioma del texto",
+              choices = langs,
+              selected = "Spanish",
+              width = "100%"
             ),
             # user text
             conditionalPanel(
@@ -47,22 +112,7 @@ ui = f7Page(
               f7File("Archivo", "Elegí un archivo",buttonLabel = "Buscar...")
             ),
             br(),
-            # Add the selector for the language of the text
-            f7Select(
-              inputId = "language",
-              label = "Idioma del texto",
-              choices =  langs,
-              selected = "Spanish",
-              width = "100%"
-            ),
-            conditionalPanel(
-              condition = "input.source == 'Escribir'",
-              actionBttn(
-                icon = icon("cloud-upload"),size = "md",style = "unite",
-                inputId = "go_words",label = "",color = "primary"
-              )
-            ),
-          
+            
             h3("   Filtrar palabras"),
             # num of words
             f7Slider(
@@ -76,25 +126,28 @@ ui = f7Page(
               value = 100,
               step = 10
             ),
-            textAreaInput(inputId = "words_to_remove", label = "Remover",rows=7,
+            textAreaInput(inputId = "words_to_remove", label = "Remover",rows=7,value = "",
                           placeholder = "Separá las palabras a remover con un espacio..."),
             f7Block()
-       
+            
           ),
           theme = "dark",
           side = "left",
           title = ""
         ),
-
-        # right-hand side bar
+        
+        # right-hand side bar ====
         f7Panel(
           effect = "cover",
           resizable = T, 
           tagList(
-            
             #bkg color
-            f7ColorPicker(inputId = "col",label =  "Color del fondo", 
-                          value = "#ffffff",modules = "hsb-sliders"), # white as default
+            spectrumInput(
+              inputId ="col", 
+              label = "Color del fondo", selected = "white",
+              update_on = "change",
+              choices = NULL,options =  list(`choose-text` = "OK")
+            ),
             # cloud shape
             f7Select(
               inputId = "wshape",
@@ -104,7 +157,19 @@ ui = f7Page(
               selected = "circle",
               width = "100%"
             ),
-            
+            # cloud ellip
+            f7Slider(
+              inputId = "wellipticity",
+              label = "Achatamiento",
+              color = "green",
+              min = 0.01,
+              max = 0.99,
+              labels = tagList(f7Icon("arrow_left_right"),
+                               f7Icon("arrow_up_down")),
+              value = 0.6,
+              step = .05
+            ),
+
             h3("   Palabras"),
             # font size
             f7Slider(
@@ -120,10 +185,10 @@ ui = f7Page(
             ),
 
             # text color
-            f7Radio(
+            f7Select(
               inputId = "wcolor",
               label = "Color",
-              choices = 
+              choices =
                 c("random-dark",
                   "random-light",
                   "tu color"
@@ -131,11 +196,15 @@ ui = f7Page(
               selected = "random-dark"
             ),
             conditionalPanel(
-              condition = "input.wcolor == tu color ",
-              f7ColorPicker(inputId = "wcolorm",label = "Tu color",
-                            value = "#ffffff",modules = "hsb-sliders"),
+              condition = "input.wcolor == 'tu color'",
+              spectrumInput(
+                inputId ="wcolorm", 
+                label = "Tu color", selected = "blue",
+                update_on = "change",
+                choices = NULL,options =  list(`choose-text` = "OK")
+              ),
             ),
-
+            
             # font weight
             f7Slider(
               inputId = "wfontWeight",
@@ -152,10 +221,15 @@ ui = f7Page(
             f7Select(
               inputId = "wfontFamily",
               label = "Tipografía",
-              choices =  fontnames,
+              choices =  c(sort(c("Helvetica","Garamond","Frutiger","Segoe UI","Lucida","Arial","Bookman Old Style")),"Otra"),
               selected = "Segoe UI",
               width = "100%"
             ),
+            conditionalPanel(
+              condition = "input.wfontFamily == 'Otra'",
+              textAreaInput(inputId = "wfontFamilym", label = "Tu tipografía",rows=2,value = "",
+                            placeholder = "Ingresá el nombre de la fuente...")
+              ),
             # grid size
             f7Slider(
               inputId = "wgridSize",
@@ -168,15 +242,19 @@ ui = f7Page(
               value = 0,
               step = 2
             ),
-
+            # 
             # rotation
-            h3("   Rotación"),
+            h4("     Rotación"),
             # min
             knobInput(
               cursor = T,
+              displayPrevious = T,
               inputId = "wminRotation",
               label = "Angulo mínimo",
-              thickness = 0.2,
+
+              thickness = 0.3,
+              width = 100, height=100,
+              # height="50%",
               post = "",
               displayInput = T,
               min = -180,
@@ -190,7 +268,10 @@ ui = f7Page(
               cursor = T,
               inputId = "wmaxRotation",
               label = "Angulo máximo",
-              thickness = 0.2,
+              thickness = 0.3,
+              width = 100, height=100,
+              fgColor = "#428BCA",
+              inputColor = "#428BCA",
               post = "",
               displayInput = T,
               min = -180,
@@ -229,16 +310,9 @@ ui = f7Page(
         f7Shadow(
           intensity = 5,
           hover = T,
-          f7Card_hw(
-            height = "100%",
-            tagList(
-              cloudBttn(
-                icon = icon("cloud"),size = "lg",style = "unite",
-                inputId = "go_cloud",label = "",color = "primary"
-              ), br(), br(),
-              # display cloud!
-              wordcloud2Output("cloud") 
-            )
+          f7Card(height = "600px",
+            # display cloud!
+            wordcloud2Output("cloud") 
           )
         )          
       ),
@@ -248,50 +322,50 @@ ui = f7Page(
         tabName = "Descargar",
         icon = f7Icon("cloud_download"),
         active = FALSE,
-        f7Block(), 
+        f7Block(),
         f7Flex(
           f7Block(),
           f7Shadow(
             intensity = 15,pressed = T,hover = T,
-            f7Card_hw(
+            f7Card(
               tagList(
                 f7Flex(
                   f7Block(),
                   f7Icon("cloud_fill",
                          style = "font-size:100px")
-                  , 
-                  f7Block() 
-                ),  
+                  ,
+                  f7Block()
+                ),
                 screenshotButton(id = "cloud",filename = "mi_nube",scale = 3,timer = 1,
                                  icon = icon("download"), class="button button-fill",
                                  label = "NUBE (.PNG) ")
               )
             )
-          ), 
+          ),
           f7Block()
         )
         ,
         f7Block()
-        , 
+        ,
         f7Flex(
           f7Block(),
           f7Shadow(
             intensity = 15,pressed = T,hover = T,
-            f7Card_hw(
+            f7Card(
               tagList(
                 f7Flex(
                   f7Block(),
                   f7Icon("square_list_fill",
-                         style = "font-size:100px;"), 
-                  f7Block() 
-                ),  
+                         style = "font-size:100px;"),
+                  f7Block()
+                ),
                 f7DownloadButton(
                   outputId = "download_csv",
                   label = "Lista (.csv)",
                   style="width:100%;",class="button button-fill external shiny-download-link")
               )
             )
-          ), 
+          ),
           f7Block()
         )
       )
@@ -306,22 +380,22 @@ ui = f7Page(
           intensity = 5,
           hover = F,
           f7Card(title =h1("WordCloud: Convertí tus palabras en una nube.", style="text-align: center;"),
-            instructions,
-            footer =
-              tagList(
-                f7Link(
-                  external = T,
-                  icon = f7Icon("logo_twitter"),
-                  label = "",
-                  src = "https://twitter.com/2exp3/"
-                ),
-                f7Link(
-                  external = T,
-                  icon = f7Icon("logo_github"),
-                  label = "",
-                  src = "https://github.com/2exp3/wordcloud"
-                )
-              )
+                 instructions,
+                 footer =
+                   tagList(
+                     f7Link(
+                       external = T,
+                       icon = f7Icon("logo_twitter"),
+                       label = "",
+                       src = "https://twitter.com/2exp3/"
+                     ),
+                     f7Link(
+                       external = T,
+                       icon = f7Icon("logo_github"),
+                       label = "",
+                       src = "https://github.com/2exp3/wordcloud"
+                     )
+                   )
           )
         )
       )
@@ -329,213 +403,202 @@ ui = f7Page(
   )
 )
 
+
 # SERVER ====
-server = function(input, output) {
+server = function(input, output, session) {
+  # waiter on cloud output canvas
+  wtr = Waiter$new(id="cloud")
+  # input data
+  data_source = reactive({
+    if (input$source == "Demo: AF") {
+      data = readLines("www/AF.txt",encoding = "UTF-8")
+    }else if (input$source == "Demo: MM") {
+      data=readLines("www/MM.txt",encoding = "UTF-8")
+    } else if (input$source == "Escribir") {
+      data = input$text
+    } else if (input$source == "Subir archivo") {
+      data = input_file()
+    }
+    return(data)
+  })
   
-  # functions ====
-  # pdf - text  conversion
-  pdf2text=function(filepath,  dpi=300){
-    # show wheel while working
-    waiter = Waiter$new(id="cloud")
-    waiter$show()
-    on.exit(waiter$hide())
+  # upload input file
+  input_file = reactive({
+    if (is.null(input$Archivo)) {
+      return("")
+    }
+    if (substr(input$Archivo$name,nchar(input$Archivo$name)-2,nchar(input$Archivo$name)) == "pdf"){
+      return(pdf_file(input$Archivo$datapath,wtr=wtr))
+    }else{
+      # if csv or txt
+      return(readLines(input$Archivo$datapath,encoding = "UTF-8") ) 
+    }
+  })
+  
+  # pdf conversion fn
+  pdf_file=function(datapath,wtr=wtr){
+    wtr$show()
     # pdf to png
-    pngfile = pdf_convert(filepath, dpi = dpi)
-    # ppng to text using lang specific engine
+    pngfile = pdf_convert(datapath, dpi = 300)
+    # png to text
     text = ocr(pngfile)
     textcat=paste(text, collapse = '') # concat char vectors (for >1-page pdfs)
+    wtr$hide()
     return(textcat)
   }
-  # to get wordfreq data from input
-  get_freq = function(data, lang = "Spanish") {
-    # If text is provided, convert it to a data table of word frequencies
-    if (!is.character(data)) {
-      return()}
-    corpus = Corpus(VectorSource(data)) 
-    corpus = tm_map(corpus, tolower)
-    corpus = tm_map(corpus, removePunctuation)
-    corpus = tm_map(corpus, removeNumbers)
-    corpus = tm_map(corpus, 
-                    removeWords, stopwords(tolower(lang)))
-    tdm = as.matrix(TermDocumentMatrix(corpus))
-    dataout = sort(rowSums(tdm), decreasing = TRUE, method="quick")
-    dataoutcl = data.table(word = names(dataout), freq = as.numeric(dataout))
-    return(dataoutcl)
-  }
-  
-  subset_data=function(data,num_words = 100, wtr=NULL){
-    # remove user words
-    datarm = data[!data$word%in%unlist(strsplit(wtr," ") ), ]
+
+  # create cloud
+  create_wordcloud = function(data, 
+                              num_words = 100, 
+                              wbackgroundColor = "white",
+                              wsize = 0.5,
+                              wgridSize = 0,
+                              wfontFamily = "Segoe UI",
+                              wfontFamilym = "",
+                              wfontWeight=400,
+                              wellipticity = 0.6,
+                              wcolor = "random-dark",
+                              wcolorm = "",
+                              wminRotation = 0,
+                              wmaxRotation = 0,
+                              wrotateRatio = 1,
+                              wshape = "circle",
+                              wtr=wtr
+                              ) {
+    wtr$show()
+    on.exit({wtr$hide()})
+    # 
+    # If text is provided, convert it to a dataframe of word frequencies
+    if (is.character(data)) {
+      corpus = Corpus(VectorSource(data))
+      corpus = tm_map(corpus, tolower)
+      corpus = tm_map(corpus, removePunctuation)
+      corpus = tm_map(corpus, removeNumbers)
+      corpus = tm_map(corpus, removeWords, 
+                      stopwords(tolower(input$language)))
+      corpus = tm_map(corpus, removeWords, 
+                      tolower(unlist(strsplit(input$words_to_remove," ") )) )
+      tdm = as.matrix(TermDocumentMatrix(corpus))
+      data = sort(rowSums(tdm), decreasing = TRUE, method="quick")
+      data = data.frame(word = names(data), freq = as.numeric(data))
+    }
+    
     # Make sure a proper num_words is provided
     if (!is.numeric(num_words) || num_words < 3) {
       num_words = 3
-    }else if(num_words>nrow(datarm)) {
-      num_words = nrow(datarm)
+    }else if(num_words>nrow(data)) {
+      num_words = nrow(data)
     }
+    
     # Grab the top n most common words
-    datarmn = head(datarm, n = num_words)
-    if (nrow(datarmn) == 0) {
+    data = head(data, n = num_words)
+    if (nrow(data) == 0) {
       return(NULL)
-    }else{
-      return(datarmn)
     }
-  }
-  
-  # to get the cloud from the data with freqs
-  create_cloud = function(data,pars) {
-    # customize cloud
-    return(wordcloud2(
-      data,
-      backgroundColor = pars$wbackgroundColor,
-      size =pars$ wsize,
-      gridSize = pars$wgridSize,
-      fontFamily = pars$wfontFamily,
-      fontWeight=pars$wfontWeight,
-      color = pars$wcolor,
-      minRotation = pars$wminRotation_rad,
-      maxRotation = pars$wmaxRotation_rad,
-      shuffle = F,
-      rotateRatio = pars$wrotateRatio,
-      shape = pars$wshape
-    ) )
-  }
-  
-  set_cloud_params = function(input) {
+    
     # transform degrees to radians
-    wminRotation_rad=input$wminRotation * (pi/180)
-    wmaxRotation_rad=input$wmaxRotation * (pi/180)
+    wminRotation_rad=wminRotation * (pi/180)
+    wmaxRotation_rad=wmaxRotation * (pi/180)
     
     # text color
-    wcolor=ifelse(input$wcolor=="tu color",
-                  input$wcolorm,
-                  input$wcolor) 
-    
-    return(list(wbackgroundColor = input$col,
-                wsize = input$wsize,
-                wgridSize = input$wgridSize,
-                wfontFamily = input$wfontFamily,
-                wfontWeight=input$wfontWeight,
-                wcolor = wcolor,
-                wminRotation = input$wminRotation,
-                wmaxRotation = input$wmaxRotation,
-                wrotateRatio = input$wrotateRatio,
-                wshape = input$wshape))
+    wcolorok=ifelse(wcolor=="tu color",
+                  wcolorm,
+                  wcolor)
+    # text font
+    wfontFamily=ifelse(wfontFamily=="Otra",
+                  wfontFamilym,
+                  wfontFamily)
+    # cloud
+    wordcloud2a(
+      data,
+      shuffle = F,
+      
+      backgroundColor = wbackgroundColor,
+      color = wcolorok,
+      
+      size = wsize,
+      fontFamily = wfontFamily,
+      fontWeight = wfontWeight,
+      
+      minRotation =wminRotation_rad ,
+      maxRotation = wmaxRotation_rad,
+      rotateRatio =wrotateRatio,
+      
+      ellipticity = wellipticity,
+      shape =wshape ,
+      gridSize = wgridSize
+      )
+
   }
   
-  # Reactivity ====
-
-  # user type data
-  data_type=eventReactive(
-    input$go_words,{
-      
-      return(input$text)
-    } 
-  )
-  
-  # user file
-  data_user=eventReactive(
-    input$Archivo,{
-      
-      if (substr(input$Archivo$name,nchar(input$Archivo$name)-2,nchar(input$Archivo$name)) == "pdf"){
-        return(pdf2text(input$Archivo$datapath,dpi = 300))
-      }else{
-        # if csv or txt
-        return(readLines(input$Archivo$datapath,encoding = "UTF-8") ) }
-    })
-  
-  # Demo data
-  data_demo= reactive({
-    if (input$source == "Demo: MM") {
-      wdata=readLines("www/MM.txt",encoding = "UTF-8")
-    } else if (input$source == "Demo: AF") {
-      wdata=readLines("www/AF.txt",encoding = "UTF-8")
-    }
-    
-    return(wdata)
-  })
-  
-  # set the actual data to process
-  data_source=reactive({
-    if(input$source %in%c("Demo: MM","Demo: AF")){
-      return(data_demo())
-    }else if (input$source=="Subir archivo"){
-      return(data_user())
-    }else if (input$source=="Escribir"){
-      return(data_type())
-    }else(return("")) # just in case sth goes wrong with file uploads
-  })
-  
-  # initialize word freq data
-  datafreq=
-    reactive({
-    return(
-    get_freq(data = data_source(),
-             lang = input$language) ) } )
-  
-  # update data on new source event and compute freqs on demand
-  observeEvent( 
-    data_source(),
-    ignoreInit = T,
-    ignoreNULL = F,{ 
-      datafreq=
-        get_freq(
-          data = data_source(),
-          lang = input$language) 
-    }
-  )
-  
-  # subset data with word freqs when pushing the cloud
-  datafreq_ss = 
-    eventReactive (
-      input$go_cloud,
-      ignoreNULL = F,{
-        
-        return(
-          subset_data(
-            data= datafreq(),
-            num_words = input$num,
-            wtr = input$words_to_remove )
-        ) 
-      } )
-  
-  # parse cloud params
-  cloudpars = 
-    eventReactive (
-      input$go_cloud,ignoreNULL = F,{
-        set_cloud_params(input)
-      }
-    )
-    
-  # create cloud on go
-  datacloud = 
-    reactive({
-        # show wheel while working
-        waiter = Waiter$new(id="cloud")
-        waiter$show()
-        on.exit(waiter$hide())
-        return(
-          create_cloud(
-            datafreq_ss(),
-            cloudpars()
-          )
-        )
-      }
-    )
-  
   # render cloud
-  output$cloud = 
-    renderWordcloud2( {
-      datacloud()
-    })
+  output$cloud = renderWordcloud2({
+    create_wordcloud(
+      data_source(),
+      num_words = input$num,
+      wbackgroundColor = input$col,
+      wsize = input$wsize,
+      wgridSize = input$wgridSize,
+      
+      wfontFamily = input$wfontFamily,
+      
+      wfontFamilym = input$wfontFamilym,
+      
+      wfontWeight=input$wfontWeight,
+      wellipticity = input$wellipticity,
+      wcolor = input$wcolor,
+      wcolorm = input$wcolorm,
+      
+      wminRotation = input$wminRotation,
+      wmaxRotation = input$wmaxRotation,
+      wrotateRatio = input$wrotateRatio,
+      wshape = input$wshape,
+      wtr=wtr
+    )
+  })
   
+  
+  
+  # create cloud
+  create_data2csv = function(data,num_words = 100) {
+    if (is.character(data)) {
+      corpus = Corpus(VectorSource(data))
+      corpus = tm_map(corpus, tolower)
+      corpus = tm_map(corpus, removePunctuation)
+      corpus = tm_map(corpus, removeNumbers)
+      corpus = tm_map(corpus, removeWords, 
+                      stopwords(tolower(input$language)))
+      corpus = tm_map(corpus, removeWords, 
+                      tolower(unlist(strsplit(input$words_to_remove," ") )) )
+      tdm = as.matrix(TermDocumentMatrix(corpus))
+      data = sort(rowSums(tdm), decreasing = TRUE, method="quick")
+      data = data.frame(word = names(data), freq = as.numeric(data))
+    }
+    # Make sure a proper num_words is provided
+    if (!is.numeric(num_words) || num_words < 3) {
+      num_words = 3
+    }else if(num_words>nrow(data)) {
+      num_words = nrow(data)
+    }
+    # Grab the top n most common words
+    data = head(data, n = num_words)
+    if (nrow(data) == 0) {
+      return(NULL)
+    }
+    return(data)
+  }
   # export word data
   output$download_csv = downloadHandler(
     filename = function() {paste0('tus_palabras','.csv')},
-    content = function(file) {write.csv(datafreq_ss(),file)
+    content = function(file) {
+      write.csv(    
+        create_data2csv(
+          data_source(),
+          num_words = input$num
+          ),
+        file)
     }
   )
 }
 
-# RUN APP ====
 shinyApp(ui = ui, server = server)
-
