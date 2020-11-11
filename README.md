@@ -4,8 +4,12 @@ Shiny app to customize wordclouds from different text input-types. In spanish.
 Inspired by this [post](https://www.statsandr.com/blog/draw-a-word-cloud-with-a-shiny-app/), I relied on [ShinyMobile](https://cran.r-project.org/web/packages/shinyMobile/) to assure a cross-device app and addedd a few controls and functionality I deemed useful.
 You may try it [here](https://2exp3.shinyapps.io/wordcloud/).
 ***
-## Con esta [app](https://2exp3.shinyapps.io/wordcloud/) podés
-         
+
+Shiny app para convertir tu texto en nubes de palabras personalizables. En español.
+Inspirado por este [post](https://www.statsandr.com/blog/draw-a-word-cloud-with-a-shiny-app/), recurrí a [ShinyMobile](https://cran.r-project.org/web/packages/shinyMobile/) para asegurarme que la app funcione bien en cualquier dispositivo, y además agregué algunos controles y funcionalidades que consideré útiles.
+Podés probarla [áca](https://2exp3.shinyapps.io/wordcloud/).
+
+## Con esta app vas a poder         
 ### Usar distintos inputs de texto con el **menú de la izquierda**:
 - Los [discursos de inicio de sesiones del Congreso](https://www.casarosada.gob.ar/informacion/discursos?start=0) de 
   - Alberto Fernández en 2020 (AF)
