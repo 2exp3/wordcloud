@@ -9,7 +9,7 @@
          <li>Mauricio Macri en 2017 (MM)</li>
          
          </ul>
-         <li>Escribir o copiar-y-pegar texto         
+         <li>Escribir o copiar-y-pegar texto        
          <li>Subir un archivo con formato
        <ul>
          <li><b>.csv</b>: OJO, todo el texto tiene que estar en la primera columna <a href="https://www.github.com/2exp3/examples/JC.csv">(ejemplo)</a></li>
@@ -32,7 +32,7 @@
          <br>
          <li> Tocar la solapa del medio para descargar tu
        <ul>
-         <li> nube en <b>.png</b>      
+         <li> nube en <b>.png</b> (esto puede tomar unos segundos)      
          <li> texto procesado (palabras y frecuencias) en <b>.csv</b>      
          </ul>
          </ol>

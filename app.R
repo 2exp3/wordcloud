@@ -3,6 +3,8 @@ library(shinyscreenshot);
 library(waiter);
 library(tesseract); library(pdftools)
 
+source("fns.R") # improved display fns
+
 #  set some overall params ====
 # set waiter theme
 waiter_set_theme(html = spin_whirly(), color = "white")
@@ -15,57 +17,12 @@ langs = langs[order(names(langs))]
 # instructions text
 instructions=HTML(readLines("www/instructions.txt",encoding = "UTF-8") ) 
 
-# remove annoying refreshing
-wordcloud2a <- function (data, size = 1, minSize = 0, gridSize = 0, fontFamily = "Segoe UI", 
-                         fontWeight = "bold", color = "random-dark", backgroundColor = "white", 
-                         minRotation = -pi/4, maxRotation = pi/4, shuffle = TRUE, 
-                         rotateRatio = 0.4, shape = "circle", ellipticity = 0.65, 
-                         widgetsize = NULL, figPath = NULL, hoverFunction = NULL) 
-{
-  if ("table" %in% class(data)) {
-    dataOut = data.frame(name = names(data), freq = as.vector(data))
-  }
-  else {
-    data = as.data.frame(data)
-    dataOut = data[, 1:2]
-    names(dataOut) = c("name", "freq")
-  }
-  if (!is.null(figPath)) {
-    if (!file.exists(figPath)) {
-      stop("cannot find fig in the figPath")
-    }
-    spPath = strsplit(figPath, "\\.")[[1]]
-    len = length(spPath)
-    figClass = spPath[len]
-    if (!figClass %in% c("jpeg", "jpg", "png", "bmp", "gif")) {
-      stop("file should be a jpeg, jpg, png, bmp or gif file!")
-    }
-    base64 = base64enc::base64encode(figPath)
-    base64 = paste0("data:image/", figClass, ";base64,", 
-                    base64)
-  }
-  else {
-    base64 = NULL
-  }
-  weightFactor = size * 180/max(dataOut$freq)
-  settings <- list(word = dataOut$name, freq = dataOut$freq, 
-                   fontFamily = fontFamily, fontWeight = fontWeight, color = color, 
-                   minSize = minSize, weightFactor = weightFactor, backgroundColor = backgroundColor, 
-                   gridSize = gridSize, minRotation = minRotation, maxRotation = maxRotation, 
-                   shuffle = shuffle, rotateRatio = rotateRatio, shape = shape, 
-                   ellipticity = ellipticity, figBase64 = base64, hover = htmlwidgets::JS(hoverFunction))
-  chart = htmlwidgets::createWidget("wordcloud2", settings, 
-                                    width = widgetsize[1], height = widgetsize[2], sizingPolicy = htmlwidgets::sizingPolicy(viewer.padding = 0, 
-                                                                                                                            browser.padding = 0, browser.fill = TRUE))
-  chart
-}
-
 
 # UI ====
 ui = f7Page(
   use_waiter(),
   title = "WordCloud",
-  init = f7Init(skin = "auto", color = "blue",theme = "light",),
+  init = f7Init(skin = "auto", color = "blue",theme = "light"),
   f7TabLayout(
     navbar = 
       f7Navbar(
@@ -91,7 +48,7 @@ ui = f7Page(
                 "Escribir",
                 "Subir archivo"
               ),
-              selected = "Demo: AF"
+              selected = "Escribir"
             ),
             # Add the selector for the language of the text
             f7Select(
@@ -104,7 +61,7 @@ ui = f7Page(
             # user text
             conditionalPanel(
               condition = "input.source == 'Escribir'",
-              textAreaInput("text", "Ingresá texto", rows = 7, placeholder = "Acá va tu texto")
+              textAreaInput("text", "Ingresá tu texto", rows = 7, placeholder = "Acá va tu texto")
             ),
             # Wrap the file input in a conditional panel
             conditionalPanel(
@@ -310,9 +267,10 @@ ui = f7Page(
         f7Shadow(
           intensity = 5,
           hover = T,
-          f7Card(height = "600px",
+          f7Card_hw(
+            height = "100%",
             # display cloud!
-            wordcloud2Output("cloud") 
+            wordcloud2Output("cloud",height = "600px") 
           )
         )          
       ),
@@ -336,10 +294,10 @@ ui = f7Page(
                   ,
                   f7Block()
                 ),
-                screenshotButton(id = "cloud",filename = "mi_nube",scale = 3,timer = 1,
+                screenshotButton(id = "cloud",filename = "mi_nube",scale = 4,timer = 1,
                                  icon = icon("download"), class="button button-fill",
                                  label = "NUBE (.PNG) ")
-              )
+              ),br(),"Esto toma unos segundos..."
             )
           ),
           f7Block()
@@ -408,6 +366,8 @@ ui = f7Page(
 server = function(input, output, session) {
   # waiter on cloud output canvas
   wtr = Waiter$new(id="cloud")
+  wtr2 = Waiter$new()
+  
   # input data
   data_source = reactive({
     if (input$source == "Demo: AF") {
@@ -427,8 +387,11 @@ server = function(input, output, session) {
     if (is.null(input$Archivo)) {
       return("")
     }
+    # show wheel
+    wtr2$show()
+    on.exit({wtr2$hide()})
     if (substr(input$Archivo$name,nchar(input$Archivo$name)-2,nchar(input$Archivo$name)) == "pdf"){
-      return(pdf_file(input$Archivo$datapath,wtr=wtr))
+      return(pdf_file(input$Archivo$datapath))
     }else{
       # if csv or txt
       return(readLines(input$Archivo$datapath,encoding = "UTF-8") ) 
@@ -436,15 +399,44 @@ server = function(input, output, session) {
   })
   
   # pdf conversion fn
-  pdf_file=function(datapath,wtr=wtr){
-    wtr$show()
+  pdf_file=function(datapath){
     # pdf to png
     pngfile = pdf_convert(datapath, dpi = 300)
     # png to text
     text = ocr(pngfile)
     textcat=paste(text, collapse = '') # concat char vectors (for >1-page pdfs)
-    wtr$hide()
     return(textcat)
+  }
+
+  # create data
+  create_data = function(data,num_words = 100) {
+    if(data==""){return("")}
+    
+    if (is.character(data)) {
+      corpus = Corpus(VectorSource(data))
+      corpus = tm_map(corpus, tolower)
+      corpus = tm_map(corpus, removePunctuation)
+      corpus = tm_map(corpus, removeNumbers)
+      corpus = tm_map(corpus, removeWords, 
+                      stopwords(tolower(input$language)))
+      corpus = tm_map(corpus, removeWords, 
+                      tolower(unlist(strsplit(input$words_to_remove," ") )) )
+      tdm = as.matrix(TermDocumentMatrix(corpus))
+      data = sort(rowSums(tdm), decreasing = TRUE, method="quick")
+      data = data.frame(word = names(data), freq = as.numeric(data))
+    } 
+    # Make sure a proper num_words is provided
+    if (!is.numeric(num_words) || num_words < 3) {
+      num_words = 3
+    }else if(num_words>nrow(data)) {
+      num_words = nrow(data)
+    }
+    # Grab the top n most common words
+    data = head(data, n = num_words)
+    if (nrow(data) == 0) {
+      return(NULL)
+    }
+    return(data)
   }
 
   # create cloud
@@ -465,37 +457,7 @@ server = function(input, output, session) {
                               wshape = "circle",
                               wtr=wtr
                               ) {
-    wtr$show()
-    on.exit({wtr$hide()})
-    # 
-    # If text is provided, convert it to a dataframe of word frequencies
-    if (is.character(data)) {
-      corpus = Corpus(VectorSource(data))
-      corpus = tm_map(corpus, tolower)
-      corpus = tm_map(corpus, removePunctuation)
-      corpus = tm_map(corpus, removeNumbers)
-      corpus = tm_map(corpus, removeWords, 
-                      stopwords(tolower(input$language)))
-      corpus = tm_map(corpus, removeWords, 
-                      tolower(unlist(strsplit(input$words_to_remove," ") )) )
-      tdm = as.matrix(TermDocumentMatrix(corpus))
-      data = sort(rowSums(tdm), decreasing = TRUE, method="quick")
-      data = data.frame(word = names(data), freq = as.numeric(data))
-    }
-    
-    # Make sure a proper num_words is provided
-    if (!is.numeric(num_words) || num_words < 3) {
-      num_words = 3
-    }else if(num_words>nrow(data)) {
-      num_words = nrow(data)
-    }
-    
-    # Grab the top n most common words
-    data = head(data, n = num_words)
-    if (nrow(data) == 0) {
-      return(NULL)
-    }
-    
+
     # transform degrees to radians
     wminRotation_rad=wminRotation * (pi/180)
     wmaxRotation_rad=wmaxRotation * (pi/180)
@@ -508,6 +470,10 @@ server = function(input, output, session) {
     wfontFamily=ifelse(wfontFamily=="Otra",
                   wfontFamilym,
                   wfontFamily)
+    
+    # in case nothing is written
+    if (data==""){return()}
+    
     # cloud
     wordcloud2a(
       data,
@@ -528,27 +494,30 @@ server = function(input, output, session) {
       shape =wshape ,
       gridSize = wgridSize
       )
-
   }
   
   # render cloud
-  output$cloud = renderWordcloud2({
-    create_wordcloud(
-      data_source(),
-      num_words = input$num,
-      wbackgroundColor = input$col,
-      wsize = input$wsize,
-      wgridSize = input$wgridSize,
-      
-      wfontFamily = input$wfontFamily,
-      
-      wfontFamilym = input$wfontFamilym,
-      
-      wfontWeight=input$wfontWeight,
-      wellipticity = input$wellipticity,
-      wcolor = input$wcolor,
-      wcolorm = input$wcolorm,
-      
+  output$cloud = 
+    renderWordcloud2({
+      wtr$show()
+      create_wordcloud(
+        data = create_data(
+          data_source(),
+          num_words = input$num),
+        num_words = input$num,
+        wbackgroundColor = input$col,
+        wsize = input$wsize,
+        wgridSize = input$wgridSize,
+        
+        wfontFamily = input$wfontFamily,
+        
+        wfontFamilym = input$wfontFamilym,
+        
+        wfontWeight=input$wfontWeight,
+        wellipticity = input$wellipticity,
+        wcolor = input$wcolor,
+        wcolorm = input$wcolorm,
+        
       wminRotation = input$wminRotation,
       wmaxRotation = input$wmaxRotation,
       wrotateRatio = input$wrotateRatio,
@@ -559,40 +528,12 @@ server = function(input, output, session) {
   
   
   
-  # create cloud
-  create_data2csv = function(data,num_words = 100) {
-    if (is.character(data)) {
-      corpus = Corpus(VectorSource(data))
-      corpus = tm_map(corpus, tolower)
-      corpus = tm_map(corpus, removePunctuation)
-      corpus = tm_map(corpus, removeNumbers)
-      corpus = tm_map(corpus, removeWords, 
-                      stopwords(tolower(input$language)))
-      corpus = tm_map(corpus, removeWords, 
-                      tolower(unlist(strsplit(input$words_to_remove," ") )) )
-      tdm = as.matrix(TermDocumentMatrix(corpus))
-      data = sort(rowSums(tdm), decreasing = TRUE, method="quick")
-      data = data.frame(word = names(data), freq = as.numeric(data))
-    }
-    # Make sure a proper num_words is provided
-    if (!is.numeric(num_words) || num_words < 3) {
-      num_words = 3
-    }else if(num_words>nrow(data)) {
-      num_words = nrow(data)
-    }
-    # Grab the top n most common words
-    data = head(data, n = num_words)
-    if (nrow(data) == 0) {
-      return(NULL)
-    }
-    return(data)
-  }
   # export word data
   output$download_csv = downloadHandler(
-    filename = function() {paste0('tus_palabras','.csv')},
+    filename = function() {'tus_palabras.csv'},
     content = function(file) {
       write.csv(    
-        create_data2csv(
+        create_data(
           data_source(),
           num_words = input$num
           ),
